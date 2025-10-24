@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Olimpo: Falacias Argumentativas - Zeus vs Dioses</title>
+<style>
+  :root{--bg1:#0b1220;--sky:#f6e7c9;--cloud:#fff;--panel:#0f1724;--accent:#ffd166;--text:#eef2ff;}
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,#0b1220 0%, #2b4666 50%, #f5d8a8 100%);font-family:Inter,Segoe UI,Arial,sans-serif;color:var(--text);}
+  canvas{display:block;margin:0 auto; background:transparent; border-radius:8px; box-shadow: 0 20px 60px rgba(2,6,23,.6);}
+  #wrap{display:flex;gap:18px;padding:18px;flex-direction:column;align-items:center;}
+  header{width:100%;max-width:980px;display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  header h1{font-size:18px;margin:0}
+  header .controls{font-size:13px;opacity:.95}
+  #ui{width:100%;max-width:980px;display:flex;gap:8px;align-items:center;justify-content:space-between}
+  .hud{background:rgba(3,7,18,.55);padding:8px 12px;border-radius:10px;display:flex;gap:10px;align-items:center;box-shadow:inset 0 0 0 1px rgba(255,255,255,.03)}
+  .bar{width:140px;height:10px;background:#1f2937;border-radius:999px;overflow:hidden}
+  .bar > i{display:block;height:100%;background:linear-gradient(90deg,#ffd166,#ffb703)}
+  button{background:#1f2937;border:0;color:var(--text);padding:8px 10px;border-radius:8px;cursor:pointer;font-weight:700}
+  #panelCheat{position:fixed;right:18px;top:80px;background:rgba(2,6,23,.9);padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,.04);max-width:320px;display:none}
+  #menuOverlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(2,6,23,.7);display:flex;align-items:center;justify-content:center;z-index:40}
+  .modal{background:rgba(12,16,22,.98);padding:18px;border-radius:12px;max-width:720px;color:var(--text);box-shadow:0 30px 80px rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.04)}
+  .grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}
+  .tip{opacity:.9;font-size:13px}
+  footer{font-size:12px;opacity:.85;margin-top:6px}
+  @media (max-width:900px){ canvas{width:95vw;height:60vh} header h1{font-size:15px} }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <header>
+    <h1>🏛️ Olimpo: Falacias argumentativas — Zeus vs Dioses</h1>
+    <div class="controls">Mover: WASD · Acércate a un dios para responder · Ver chuleta: botón "Chuleta"</div>
+  </header>
+
+  <div id="ui" style="max-width:980px">
+    <div class="hud"><strong>Vida</strong>
+      <div class="bar" style="margin-left:8px"><i id="hpFill" style="width:100%"></i></div>
+      <div id="hpTxt" style="min-width:36px;text-align:center;font-weight:700">100</div>
+    </div>
+    <div class="hud"><strong>Puntos</strong><div id="scoreTxt" style="margin-left:10px;font-weight:800">0</div></div>
+    <div class="hud"><strong>Ronda</strong><div id="waveTxt" style="margin-left:10px;font-weight:800">1</div></div>
+    <div style="margin-left:auto;display:flex;gap:8px">
+      <button id="btnCheat">Chuleta</button>
+      <button id="btnRestart">Reiniciar</button>
+    </div>
+  </div>
+
+  <canvas id="game" width="960" height="540" aria-label="Campo de batalla en el Monte Olimpo"></canvas>
+
+  <footer>Hecho sin assets externos — todo dibujado con canvas. Responde bien para que Zeus lance rayos ⚡</footer>
+</div>
+
+<!-- Modal: pregunta -->
+<div id="menuOverlay" style="display:none">
+  <div class="modal" id="modalBox">
+    <h2 id="qTitle">Pregunta</h2>
+    <p id="qText" class="tip">...</p>
+    <div class="grid2" id="qOptions"></div>
+    <p id="qFeedback" class="tip" style="margin-top:10px"></p>
+    <div style="display:flex;justify-content:flex-end;margin-top:12px">
+      <button id="btnCloseQ">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Chuleta: respuestas -->
+<div id="panelCheat">
+  <h3>Chuleta — Falacias & respuestas</h3>
+  <ol id="cheatList" style="padding-left:16px"></ol>
+</div>
+
+<script>
+(() => {
+  // ---------- Config y canvas ----------
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  // UI
+  const hpFill = document.getElementById('hpFill');
+  const hpTxt = document.getElementById('hpTxt');
+  const scoreTxt = document.getElementById('scoreTxt');
+  const waveTxt = document.getElementById('waveTxt');
+  const btnCheat = document.getElementById('btnCheat');
+  const panelCheat = document.getElementById('panelCheat');
+  const menuOverlay = document.getElementById('menuOverlay');
+  const qTitle = document.getElementById('qTitle');
+  const qText = document.getElementById('qText');
+  const qOptions = document.getElementById('qOptions');
+  const qFeedback = document.getElementById('qFeedback');
+  const btnCloseQ = document.getElementById('btnCloseQ');
+  const cheatList = document.getElementById('cheatList');
+  const btnRestart = document.getElementById('btnRestart');
+
+  // ---------- Banco de preguntas (dioses -> falacia) ----------
+  // personaje, pregunta, opciones, correcta (índice)
+  const QUESTION_BANK = [
+    {
+      personaje: "Ares (Ad Hominem)",
+      texto: "Ares dice: 'No escuches a Helena, es un cobarde, no sabes nada.' ¿Qué falacia es?",
+      opciones: ["Apelación a la autoridad","Ad Hominem","Falsa causa",]()
